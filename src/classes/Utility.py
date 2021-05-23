@@ -36,9 +36,14 @@ art = colorText.GREEN + '''
 lastScreened = 'last_screened_results.pkl'
 
 # Class for managing misc and utility methods
-class tools:
 
-    def clearScreen():
+
+class tools:
+    def __init__(self):
+        self.loadDictSize = 0
+        self.saveDictSize = 0
+
+    def clearScreen(self):
         if platform.system() == 'Windows':
             os.system('cls')
         else:
@@ -46,90 +51,112 @@ class tools:
         print(art)
 
     # Print about developers and repository
-    def showDevInfo():
+    def showDevInfo(self):
         print('\n'+changelog)
-        print(colorText.BOLD + colorText.WARN + "\n[+] Developer: Pranjal Joshi." + colorText.END)
-        print(colorText.BOLD + colorText.WARN + ("[+] Version: %s" % VERSION) + colorText.END)
-        print(colorText.BOLD + colorText.WARN + "[+] More: https://github.com/pranjal-joshi/Screeni-py" + colorText.END)
-        print(colorText.BOLD + colorText.WARN + "[+] Post Feedback/Issues here: https://github.com/pranjal-joshi/Screeni-py/issues" + colorText.END)
-        print(colorText.BOLD + colorText.WARN + "[+] Download latest software from https://github.com/pranjal-joshi/Screeni-py/releases/latest" + colorText.END)
+        print(colorText.BOLD + colorText.WARN +
+              "\n[+] Developer: Pranjal Joshi." + colorText.END)
+        print(colorText.BOLD + colorText.WARN +
+              ("[+] Version: %s" % VERSION) + colorText.END)
+        print(colorText.BOLD + colorText.WARN +
+              "[+] More: https://github.com/pranjal-joshi/Screeni-py" + colorText.END)
+        print(colorText.BOLD + colorText.WARN +
+              "[+] Post Feedback/Issues here: https://github.com/pranjal-joshi/Screeni-py/issues" + colorText.END)
+        print(colorText.BOLD + colorText.WARN +
+              "[+] Download latest software from https://github.com/pranjal-joshi/Screeni-py/releases/latest" + colorText.END)
         input('')
 
     # Save last screened result to pickle file
-    def setLastScreenedResults(df):
+    def setLastScreenedResults(self, df):
         try:
             df.sort_values(by=['Stock'], ascending=True, inplace=True)
             df.to_pickle(lastScreened)
         except IOError:
-            input(colorText.BOLD + colorText.FAIL + '[+] Failed to save recently screened result table on disk! Skipping..' + colorText.END)
+            input(colorText.BOLD + colorText.FAIL +
+                  '[+] Failed to save recently screened result table on disk! Skipping..' + colorText.END)
 
     # Load last screened result to pickle file
-    def getLastScreenedResults():
+    def getLastScreenedResults(self):
         try:
             df = pd.read_pickle(lastScreened)
-            print(colorText.BOLD + colorText.GREEN + '\n[+] Showing recently screened results..\n' + colorText.END)
+            print(colorText.BOLD + colorText.GREEN +
+                  '\n[+] Showing recently screened results..\n' + colorText.END)
             print(tabulate(df, headers='keys', tablefmt='psql'))
-            print(colorText.BOLD + colorText.WARN + "[+] Note: Trend calculation is based on number of recent days to screen as per your configuration." + colorText.END)
-            input(colorText.BOLD + colorText.GREEN + '[+] Press any key to continue..' + colorText.END)
+            print(colorText.BOLD + colorText.WARN +
+                  "[+] Note: Trend calculation is based on number of recent days to screen as per your configuration." + colorText.END)
+            input(colorText.BOLD + colorText.GREEN +
+                  '[+] Press any key to continue..' + colorText.END)
         except FileNotFoundError:
-            print(colorText.BOLD + colorText.FAIL + '[+] Failed to load recently screened result table from disk! Skipping..' + colorText.END)
+            print(colorText.BOLD + colorText.FAIL +
+                  '[+] Failed to load recently screened result table from disk! Skipping..' + colorText.END)
 
-    def isTradingTime():
+    def isTradingTime(self):
         curr = datetime.datetime.now(pytz.timezone('Asia/Kolkata'))
         openTime = curr.replace(hour=9, minute=15)
         closeTime = curr.replace(hour=15, minute=30)
-        isTradingTime = ((openTime <= curr <= closeTime) and
-                        (0 <= curr.weekday() <= 4))
+        return ((openTime <= curr <= closeTime) and
+                (0 <= curr.weekday() <= 4))
 
-
-    def saveStockData(stockDict, configManager):
+    def saveStockData(self, stockDict, configManager):
         today_date = datetime.date.today().strftime("%d%m%y")
         cache_file = "stock_data_" + str(today_date) + ".pkl"
         configManager.deleteStockData(excludeFile=cache_file)
-        if not os.path.exists(cache_file):
+        self.saveDictSize = 0
+        for _ in stockDict:
+            self.saveDictSize += 1
+        if not os.path.exists(cache_file) or (self.saveDictSize > self.loadDictSize):
             with open(cache_file, 'wb') as f:
                 try:
                     pickle.dump(stockDict.copy(), f)
-                    print(colorText.BOLD + colorText.GREEN + "=> Done." + colorText.END)
+                    print(colorText.BOLD + colorText.GREEN +
+                          "=> Done." + colorText.END)
                 except pickle.PicklingError:
-                    print(colorText.BOLD + colorText.FAIL + "=> Error while Caching Stock Data." + colorText.END)            
+                    print(colorText.BOLD + colorText.FAIL +
+                          "=> Error while Caching Stock Data." + colorText.END)
 
-    def loadStockData(stockDict):
+    def loadStockData(self, stockDict):
         today_date = datetime.date.today().strftime("%d%m%y")
         cache_file = "stock_data_" + str(today_date) + ".pkl"
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as f:
                 try:
                     stockData = pickle.load(f)
-                    print(colorText.BOLD + colorText.GREEN + "[+] Automatically Using Cached Stock Data due to After-Market hours!" + colorText.END)
+                    print(colorText.BOLD + colorText.GREEN +
+                          "[+] Automatically Using Cached Stock Data due to After-Market hours!" + colorText.END)
+                    self.loadDictSize = 0
                     for stock in stockData:
                         stockDict[stock] = stockData.get(stock)
+                        self.loadDictSize += 1
                 except pickle.UnpicklingError:
-                    print(colorText.BOLD + colorText.FAIL + "[+] Error while Reading Stock Cache." + colorText.END)
+                    print(colorText.BOLD + colorText.FAIL +
+                          "[+] Error while Reading Stock Cache." + colorText.END)
 
     # Save screened results to excel
-    def promptSaveResults(df):
+    def promptSaveResults(self, df):
         try:
-            response = str(input(colorText.BOLD + colorText.WARN + '[>] Do you want to save the results in excel file? [Y/N]: ')).upper()
+            response = str(input(colorText.BOLD + colorText.WARN +
+                                 '[>] Do you want to save the results in excel file? [Y/N]: ')).upper()
         except ValueError:
             response = 'Y'
         if response != 'N':
-            filename = 'screenipy-result_'+datetime.datetime.now().strftime("%d-%m-%y_%H.%M.%S")+".xlsx"
+            filename = 'screenipy-result_' + \
+                datetime.datetime.now().strftime("%d-%m-%y_%H.%M.%S")+".xlsx"
             df.to_excel(filename)
-            print(colorText.BOLD + colorText.GREEN + ("[+] Results saved to %s" % filename) + colorText.END)
+            print(colorText.BOLD + colorText.GREEN +
+                  ("[+] Results saved to %s" % filename) + colorText.END)
 
     # Prompt for asking RSI
-    def promptRSIValues():
+    def promptRSIValues(self):
         try:
-            minRSI, maxRSI = int(input(colorText.BOLD + colorText.WARN + "\n[+] Enter Min RSI value: " + colorText.END)), int(input(colorText.BOLD + colorText.WARN + "[+] Enter Max RSI value: " + colorText.END))
+            minRSI, maxRSI = int(input(colorText.BOLD + colorText.WARN + "\n[+] Enter Min RSI value: " + colorText.END)), int(
+                input(colorText.BOLD + colorText.WARN + "[+] Enter Max RSI value: " + colorText.END))
             if (minRSI >= 0 and minRSI <= 100) and (maxRSI >= 0 and maxRSI <= 100) and (minRSI <= maxRSI):
                 return (minRSI, maxRSI)
             raise ValueError
         except ValueError:
-            return (0,0)
+            return (0, 0)
 
     # Prompt for Reversal screening
-    def promptReversalScreening():
+    def promptReversalScreening(self):
         try:
             resp = int(input(colorText.BOLD + colorText.WARN + """\n[+] Select Option:
     1 > Screen for Buy Signal (Bullish Reversal)
@@ -144,7 +171,7 @@ class tools:
             return None
 
     # Prompt for Reversal screening
-    def promptChartPatterns():
+    def promptChartPatterns(self):
         try:
             resp = int(input(colorText.BOLD + colorText.WARN + """\n[+] Select Option:
     1 > Screen for Bullish Inside Bar (Flag) Pattern
@@ -152,11 +179,13 @@ class tools:
     0 > Cancel
 [+] Select option: """ + colorText.END))
             if resp == 1 or resp == 2:
-                candles = int(input(colorText.BOLD + colorText.WARN + "\n[+] How many candles (TimeFrame) to look back Inside Bar formation? : " + colorText.END))
+                candles = int(input(colorText.BOLD + colorText.WARN +
+                                    "\n[+] How many candles (TimeFrame) to look back Inside Bar formation? : " + colorText.END))
                 return (resp, candles)
             if resp >= 0 and resp <= 2:
                 return resp
             raise ValueError
         except ValueError:
-            input(colorText.BOLD + colorText.FAIL + "\n[+] Invalid Option Selected. Press Any Key to Continue..." + colorText.END)
+            input(colorText.BOLD + colorText.FAIL +
+                  "\n[+] Invalid Option Selected. Press Any Key to Continue..." + colorText.END)
             return (None, None)

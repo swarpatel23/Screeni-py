@@ -4,25 +4,25 @@
 # Pyinstaller compile Linux  : pyinstaller --onefile --icon=src/icon.ico src/screenipy.py  --hidden-import cmath --hidden-import talib.stream
 
 # Keep module imports prior to classes
+import classes.Fetcher as Fetcher
+import classes.ConfigManager as ConfigManager
+import classes.Screener as Screener
+import classes.Utility as Utility
+from classes.ColorText import colorText
+from classes.OtaUpdater import OTAUpdater
+from classes.CandlePatterns import CandlePatterns
+from classes.ParallelProcessing import StockConsumer
+from classes.Changelog import VERSION
+import os
+import sys
+import urllib
+import numpy as np
+import pandas as pd
+from datetime import datetime
+from tabulate import tabulate
+from time import sleep
 import multiprocessing
 multiprocessing.freeze_support()
-from time import sleep
-from tabulate import tabulate
-from datetime import datetime
-import pandas as pd
-import numpy as np
-import urllib
-import sys
-import os
-from classes.Changelog import VERSION
-from classes.ParallelProcessing import StockConsumer
-from classes.CandlePatterns import CandlePatterns
-from classes.OtaUpdater import OTAUpdater
-from classes.ColorText import colorText
-import classes.Utility as Utility
-import classes.Screener as Screener
-import classes.ConfigManager as ConfigManager
-import classes.Fetcher as Fetcher
 
 # Try Fixing bug with this symbol
 TEST_STKCODE = "SBIN"
@@ -38,6 +38,7 @@ keyboardInterruptEvent = None
 loadedStockData = False
 
 configManager = ConfigManager.tools()
+utility = Utility.tools()
 fetcher = Fetcher.tools(configManager)
 screener = Screener.tools(configManager)
 candlePatterns = CandlePatterns()
@@ -81,7 +82,7 @@ def initExecution():
         print(colorText.BOLD + colorText.FAIL +
               '\n[+] Please enter a valid numeric option & Try Again!' + colorText.END)
         sleep(2)
-        Utility.tools.clearScreen()
+        utility.clearScreen()
         return initExecution()
 
 # Main function
@@ -127,18 +128,18 @@ def main(testing=False):
             main()
         print(colorText.END)
     if executeOption == 5:
-        minRSI, maxRSI = Utility.tools.promptRSIValues()
+        minRSI, maxRSI = utility.promptRSIValues()
         if (not minRSI and not maxRSI):
             print(colorText.BOLD + colorText.FAIL +
                   '\n[+] Error: Invalid values for RSI! Values should be in range of 0 to 100. Screening aborted.' + colorText.END)
             input('')
             main()
     if executeOption == 6:
-        reversalOption = Utility.tools.promptReversalScreening()
+        reversalOption = utility.promptReversalScreening()
         if reversalOption is None or reversalOption == 0:
             main()
     if executeOption == 7:
-        respBullBear, insideBarToLookback = Utility.tools.promptChartPatterns()
+        respBullBear, insideBarToLookback = utility.promptChartPatterns()
         if insideBarToLookback is None:
             main()
     if executeOption == 8:
@@ -148,10 +149,10 @@ def main(testing=False):
         configManager.showConfigFile()
         main()
     if executeOption == 10:
-        Utility.tools.getLastScreenedResults()
+        utility.getLastScreenedResults()
         main()
     if executeOption == 11:
-        Utility.tools.showDevInfo()
+        utility.showDevInfo()
         main()
     if executeOption == 12:
         input(colorText.BOLD + colorText.FAIL +
@@ -166,9 +167,9 @@ def main(testing=False):
                   "\n\n[+] Oops! It looks like you don't have an Internet connectivity at the moment! Press any key to exit!" + colorText.END)
             input('')
             sys.exit(0)
-        
-        if not Utility.tools.isTradingTime() and configManager.cacheEnabled and not loadedStockData and not testing:
-            Utility.tools.loadStockData(stockDict)
+
+        if not utility.isTradingTime() and configManager.cacheEnabled and not loadedStockData and not testing:
+            utility.loadStockData(stockDict)
             loadedStockData = True
 
         print(colorText.BOLD + colorText.WARN +
@@ -222,7 +223,8 @@ def main(testing=False):
                     keyboardInterruptEvent.set()
                 except KeyboardInterrupt:
                     pass
-                print(colorText.BOLD + colorText.FAIL +"\n[+] Terminating Script, Please wait..." + colorText.END)
+                print(colorText.BOLD + colorText.FAIL +
+                      "\n[+] Terminating Script, Please wait..." + colorText.END)
                 for worker in consumers:
                     worker.terminate()
 
@@ -256,12 +258,13 @@ def main(testing=False):
         )
         print(tabulate(screenResults, headers='keys', tablefmt='psql'))
 
-        if executeOption != 0 and configManager.cacheEnabled and not Utility.tools.isTradingTime() and not testing:
-            print(colorText.BOLD + colorText.GREEN + "[+] Caching Stock Data for future use, Please Wait... " + colorText.END, end='')
-            Utility.tools.saveStockData(stockDict, configManager)
+        if executeOption != 0 and configManager.cacheEnabled and not utility.isTradingTime() and not testing:
+            print(colorText.BOLD + colorText.GREEN +
+                  "[+] Caching Stock Data for future use, Please Wait... " + colorText.END, end='')
+            utility.saveStockData(stockDict, configManager)
 
-        Utility.tools.setLastScreenedResults(screenResults)
-        Utility.tools.promptSaveResults(saveResults)
+        utility.setLastScreenedResults(screenResults)
+        utility.promptSaveResults(saveResults)
         print(colorText.BOLD + colorText.WARN +
               "[+] Note: Trend calculation is based on number of days recent to screen as per your configuration." + colorText.END)
         print(colorText.BOLD + colorText.GREEN +
@@ -270,7 +273,7 @@ def main(testing=False):
 
 
 if __name__ == "__main__":
-    Utility.tools.clearScreen()
+    utility.clearScreen()
     isDevVersion = OTAUpdater.checkForUpdate(proxyServer, VERSION)
     try:
         while True:
