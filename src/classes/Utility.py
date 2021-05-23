@@ -9,6 +9,10 @@ import os
 import sys
 import platform
 import datetime
+import datetime
+#from datetime import datetime, date
+import pytz
+import pickle
 import pandas as pd
 from tabulate import tabulate
 from classes.ColorText import colorText
@@ -69,6 +73,39 @@ class tools:
             input(colorText.BOLD + colorText.GREEN + '[+] Press any key to continue..' + colorText.END)
         except FileNotFoundError:
             print(colorText.BOLD + colorText.FAIL + '[+] Failed to load recently screened result table from disk! Skipping..' + colorText.END)
+
+    def isTradingTime():
+        curr = datetime.datetime.now(pytz.timezone('Asia/Kolkata'))
+        openTime = curr.replace(hour=9, minute=15)
+        closeTime = curr.replace(hour=15, minute=30)
+        isTradingTime = ((openTime <= curr <= closeTime) and
+                        (0 <= curr.weekday() <= 4))
+
+
+    def saveStockData(stockDict, configManager):
+        today_date = datetime.date.today().strftime("%d%m%y")
+        cache_file = "stock_data_" + str(today_date) + ".pkl"
+        configManager.deleteStockData(excludeFile=cache_file)
+        if not os.path.exists(cache_file):
+            with open(cache_file, 'wb') as f:
+                try:
+                    pickle.dump(stockDict.copy(), f)
+                    print(colorText.BOLD + colorText.GREEN + "=> Done." + colorText.END)
+                except pickle.PicklingError:
+                    print(colorText.BOLD + colorText.FAIL + "=> Error while Caching Stock Data." + colorText.END)            
+
+    def loadStockData(stockDict):
+        today_date = datetime.date.today().strftime("%d%m%y")
+        cache_file = "stock_data_" + str(today_date) + ".pkl"
+        if os.path.exists(cache_file):
+            with open(cache_file, 'rb') as f:
+                try:
+                    stockData = pickle.load(f)
+                    print(colorText.BOLD + colorText.GREEN + "[+] Automatically Using Cached Stock Data due to After-Market hours!" + colorText.END)
+                    for stock in stockData:
+                        stockDict[stock] = stockData.get(stock)
+                except pickle.UnpicklingError:
+                    print(colorText.BOLD + colorText.FAIL + "[+] Error while Reading Stock Cache." + colorText.END)
 
     # Save screened results to excel
     def promptSaveResults(df):
