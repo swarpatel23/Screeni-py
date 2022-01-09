@@ -18,6 +18,7 @@ import os
 import platform
 import sys
 import urllib
+import json
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -89,7 +90,7 @@ def initExecution():
 
     if tickerOption and tickerOption != 'W':
         print(colorText.BOLD + colorText.WARN +
-            '\n[+] Select a Critera for Stock Screening: ' + colorText.END)
+              '\n[+] Select a Critera for Stock Screening: ' + colorText.END)
         print(colorText.BOLD + '''
     0 > Full Screening (Shows Technical Parameters without Any Criteria)
     1 > Screen stocks for Breakout or Consolidation
@@ -104,7 +105,7 @@ def initExecution():
     10 > Show Last Screened Results
     11 > About Developer
     12 > Exit''' + colorText.END
-            )
+              )
     try:
         if tickerOption and tickerOption != 'W':
             executeOption = input(
@@ -128,7 +129,9 @@ def initExecution():
     return tickerOption, executeOption
 
 # Main function
-def main(testing=False):
+
+
+def main(requestDict, testing=False):
     global screenCounter, screenResultsCounter, stockDict, loadedStockData, keyboardInterruptEvent, loadCount, maLength
     screenCounter = multiprocessing.Value('i', 1)
     screenResultsCounter = multiprocessing.Value('i', 0)
@@ -146,12 +149,13 @@ def main(testing=False):
     reversalOption = None
 
     screenResults = pd.DataFrame(columns=[
-                                 'Stock', 'Consolidating', 'Breaking-Out', 'LTP', 'Volume', 'MA-Signal', 'RSI', 'Trend', 'Pattern'])
+                                 'Stock', 'Consolidating', 'BreakingOut', 'LTP', 'Volume', 'MASignal', 'RSI', 'Trend', 'Pattern'])
     saveResults = pd.DataFrame(columns=[
-                               'Stock', 'Consolidating', 'Breaking-Out', 'LTP', 'Volume', 'MA-Signal', 'RSI', 'Trend', 'Pattern'])
+                               'Stock', 'Consolidating', 'BreakingOut', 'LTP', 'Volume', 'MASignal', 'RSI', 'Trend', 'Pattern'])
 
     try:
-        tickerOption, executeOption = initExecution()
+        tickerOption, executeOption = int(requestDict.get(
+            'ticker')), int(requestDict.get('screening'))
     except KeyboardInterrupt:
         input(colorText.BOLD + colorText.FAIL +
               "[+] Press any key to Exit!" + colorText.END)
@@ -159,8 +163,7 @@ def main(testing=False):
 
     if executeOption == 4:
         try:
-            daysForLowestVolume = int(input(colorText.BOLD + colorText.WARN +
-                                            '\n[+] The Volume should be lowest since last how many candles? '))
+            daysForLowestVolume = int(requestDict.get('lowestVolumeDays'))
         except ValueError:
             print(colorText.END)
             print(colorText.BOLD + colorText.FAIL +
@@ -169,18 +172,21 @@ def main(testing=False):
             main()
         print(colorText.END)
     if executeOption == 5:
-        minRSI, maxRSI = Utility.tools.promptRSIValues()
+        minRSI, maxRSI = int(requestDict.get('minRSI')), int(
+            requestDict.get('maxRSI'))
         if (not minRSI and not maxRSI):
             print(colorText.BOLD + colorText.FAIL +
                   '\n[+] Error: Invalid values for RSI! Values should be in range of 0 to 100. Screening aborted.' + colorText.END)
             input('')
             main()
     if executeOption == 6:
-        reversalOption, maLength = Utility.tools.promptReversalScreening()
+        reversalOption, maLength = int(requestDict.get(
+            'reversal')), int(requestDict.get('MALength'))
         if reversalOption is None or reversalOption == 0:
             main()
     if executeOption == 7:
-        respChartPattern, insideBarToLookback = Utility.tools.promptChartPatterns()
+        respChartPattern, insideBarToLookback = int(requestDict.get(
+            'chartPattern')), int(requestDict.get('lookBackBars'))
         if insideBarToLookback is None:
             main()
     if executeOption == 8:
@@ -210,7 +216,8 @@ def main(testing=False):
                           f'[+] Create the watchlist.xlsx file in {os.getcwd()} and Restart the Program!' + colorText.END)
                     sys.exit(0)
             else:
-                listStockCodes = fetcher.fetchStockCodes(tickerOption, proxyServer=proxyServer)
+                listStockCodes = fetcher.fetchStockCodes(
+                    tickerOption, proxyServer=proxyServer)
         except urllib.error.URLError:
             print(colorText.BOLD + colorText.FAIL +
                   "\n\n[+] Oops! It looks like you don't have an Internet connectivity at the moment! Press any key to exit!" + colorText.END)
@@ -272,6 +279,8 @@ def main(testing=False):
                     while numStocks:
                         result = results_queue.get()
                         if result is not None:
+                            yield 'data: {}\n\n'.format(str(json.dumps(result[0])))
+                            # yield str(result[1])
                             screenResults = screenResults.append(
                                 result[0], ignore_index=True)
                             saveResults = saveResults.append(
@@ -314,18 +323,18 @@ def main(testing=False):
         screenResults.rename(
             columns={
                 'Trend': f'Trend ({configManager.daysToLookback}Days)',
-                'Breaking-Out': f'Breakout ({configManager.daysToLookback}Days)'
+                'BreakingOut': f'Breakout ({configManager.daysToLookback}Days)'
             },
             inplace=True
         )
         saveResults.rename(
             columns={
                 'Trend': f'Trend ({configManager.daysToLookback}Days)',
-                'Breaking-Out': 'Breakout ({configManager.daysToLookback}Days)'
+                'BreakingOut': 'Breakout ({configManager.daysToLookback}Days)'
             },
             inplace=True
         )
-        print(tabulate(screenResults, headers='keys', tablefmt='psql'))
+        #print(tabulate(screenResults, headers='keys', tablefmt='psql'))
 
         if configManager.cacheEnabled and not Utility.tools.isTradingTime() and not testing:
             print(colorText.BOLD + colorText.GREEN +
@@ -334,19 +343,22 @@ def main(testing=False):
                 stockDict, configManager, loadCount)
 
         Utility.tools.setLastScreenedResults(screenResults)
-        Utility.tools.promptSaveResults(saveResults)
-        print(colorText.BOLD + colorText.WARN +
-              "[+] Note: Trend calculation is based on number of days recent to screen as per your configuration." + colorText.END)
-        print(colorText.BOLD + colorText.GREEN +
-              "[+] Screening Completed! Press Enter to Continue.." + colorText.END)
-        input('')
+        return
+        # Utility.tools.promptSaveResults(saveResults)
+        # print(colorText.BOLD + colorText.WARN +
+        #       "[+] Note: Trend calculation is based on number of days recent to screen as per your configuration." + colorText.END)
+        # print(colorText.BOLD + colorText.GREEN +
+        #       "[+] Screening Completed! Press Enter to Continue.." + colorText.END)
+        # input('')
+        # return saveResults.to_json(orient="index")
 
 
 if __name__ == "__main__":
     Utility.tools.clearScreen()
     isDevVersion = OTAUpdater.checkForUpdate(proxyServer, VERSION)
     if not configManager.checkConfigFile():
-        configManager.setConfig(ConfigManager.parser, default=True, showFileCreatedText=False)
+        configManager.setConfig(ConfigManager.parser,
+                                default=True, showFileCreatedText=False)
     try:
         while True:
             main()

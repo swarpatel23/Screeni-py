@@ -1,0 +1,115 @@
+<div>
+  <!-- <h1 style="color: green;">ScreeniPy</h1> -->
+  <div class="grid">
+    <div class="col-2">
+      <h4 class="label">Ticker Option</h4>
+      <div>
+        <p-dropdown [style]="{'width':'100%'}" [options]="tickerOptions" [(ngModel)]="selectedTickerOption"
+          optionLabel="name">
+        </p-dropdown>
+      </div>
+    </div>
+    <div class="col-3">
+      <h4 class="label">Screening Option</h4>
+      <p-dropdown [style]="{'width':'100%'}" [options]="screeningOptions" [(ngModel)]="selectedScreeningOption"
+        optionLabel="name">
+      </p-dropdown>
+    </div>
+    <div class=col-2 *ngIf="selectedScreeningOption.value == '4'">
+      <!-- input for day for lowest volume-->
+      <h4 class="label">Lowest Volume Days</h4>
+      <input pInputText type="number" [style]="{'width':'100%'}" [(ngModel)]="lowestVolumeDays">
+    </div>
+    <!-- input for min and max RSI-->
+    <div class=" col-2" *ngIf="selectedScreeningOption.value == '5'">
+      <h4 class="label">Min RSI</h4>
+      <input pInputText type="number" [style]="{'width':'100%'}" [(ngModel)]="minRSI">
+    </div>
+    <div class="col-2" *ngIf="selectedScreeningOption.value == '5'">
+      <h4 class="label">Max RSI</h4>
+      <input pInputText type="number" [style]="{'width':'100%'}" [(ngModel)]="maxRSI">
+    </div>
+    <!-- input for reversal signal -->
+    <div class="col-2" *ngIf="selectedScreeningOption.value == '6'">
+      <h4 class="label">Reversal Option</h4>
+      <p-dropdown [style]="{'width':'100%'}" [options]="reversalOptions" [(ngModel)]="selectedReversalOption"
+        optionLabel="name">
+      </p-dropdown>
+    </div>
+    <div class="col-2" *ngIf="selectedScreeningOption.value == '6' && selectedReversalOption.value == '4'">
+      <h4 class="label">MA Length</h4>
+      <input pInputText type="number" [style]="{'width':'100%'}" [(ngModel)]="MALength">
+    </div>
+    <!--- input for chart pattern -->
+    <div class="col-2" *ngIf="selectedScreeningOption.value == '7'">
+      <h4 class="label">Chart Pattern</h4>
+      <p-dropdown [style]="{'width':'100%'}" [options]="chartPatternOptions" [(ngModel)]="selectedChartPatternOption"
+        optionLabel="name">
+      </p-dropdown>
+    </div>
+    <div class="col-2"
+      *ngIf="selectedScreeningOption.value == '7' && (selectedChartPatternOption.value == '1' || selectedChartPatternOption.value == '2')">
+      <h4 class="label">Bars to look back</h4>
+      <input pInputText type="number" [style]="{'width':'100%'}" [(ngModel)]="lookBackBars">
+    </div>
+    <div class="col-2" style="margin-top: auto; margin-bottom: 8px;">
+      <p-button label="Run" (onClick)="screenStocks()"></p-button>
+    </div>
+  </div>
+  <div class="grid" class='col-12'>
+    <p-table #dt [value]="stockData" responsiveLayout="scroll" [rowHover]="true" [loading]="loading" [rowHover]="true"
+      [globalFilterFields]="['Stock']">
+      <ng-template pTemplate="caption">
+        <div class="table-header">
+          <input pInputText type="text" (input)="applyFilterGlobal($event, 'contains')" placeholder="Stock Search" />
+        </div>
+      </ng-template>
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Stock</th>
+          <th>LTP</th>
+          <th>Breaking Out</th>
+          <th>Consolidating</th>
+          <th>MA-Signal</th>
+          <th>RSI</th>
+          <th>Volume</th>
+          <th>Trend</th>
+          <th>Pattern</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-stock>
+        <tr>
+          <td>
+            <div [innerHTML]="stock.Stock"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.LTP"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.BreakingOut"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.Consolidating"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.MASignal"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.RSI"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.Volume"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.Trend"></div>
+          </td>
+          <td>
+            <div [innerHTML]="stock.Pattern"></div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+</div>
+<router-outlet></router-outlet>

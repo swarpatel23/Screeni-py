@@ -29,7 +29,7 @@ else:
 class StockConsumer(multiprocessing.Process):
 
     def __init__(self, task_queue, result_queue, screenCounter, screenResultsCounter, stockDict, proxyServer, keyboardInterruptEvent):
-        multiprocessing.Process.__init__(self)
+        multiprocessing.Process.__init__(self, name='screenipy')
         self.multiprocessingForWindows()
         self.task_queue = task_queue
         self.result_queue = result_queue
@@ -60,11 +60,11 @@ class StockConsumer(multiprocessing.Process):
     def screenStocks(self, executeOption, reversalOption, maLength, daysForLowestVolume, minRSI, maxRSI, respChartPattern, insideBarToLookback, totalSymbols,
                      configManager, fetcher, screener, candlePatterns, stock, printCounter=False):
         screenResults = pd.DataFrame(columns=[
-            'Stock', 'Consolidating', 'Breaking-Out', 'MA-Signal', 'Volume', 'LTP', 'RSI', 'Trend', 'Pattern'])
-        screeningDictionary = {'Stock': "", 'Consolidating': "",  'Breaking-Out': "",
-                               'MA-Signal': "", 'Volume': "", 'LTP': 0, 'RSI': 0, 'Trend': "", 'Pattern': ""}
-        saveDictionary = {'Stock': "", 'Consolidating': "", 'Breaking-Out': "",
-                          'MA-Signal': "", 'Volume': "", 'LTP': 0, 'RSI': 0, 'Trend': "", 'Pattern': ""}
+            'Stock', 'Consolidating', 'BreakingOut', 'MASignal', 'Volume', 'LTP', 'RSI', 'Trend', 'Pattern'])
+        screeningDictionary = {'Stock': "", 'Consolidating': "",  'BreakingOut': "",
+                               'MASignal': "", 'Volume': "", 'LTP': 0, 'RSI': 0, 'Trend': "", 'Pattern': ""}
+        saveDictionary = {'Stock': "", 'Consolidating': "", 'BreakingOut': "",
+                          'MASignal': "", 'Volume': "", 'LTP': 0, 'RSI': 0, 'Trend': "", 'Pattern': ""}
 
         try:
             period = configManager.period
@@ -104,8 +104,12 @@ class StockConsumer(multiprocessing.Process):
             if not processedData.empty:
                 # screeningDictionary['Stock'] = colorText.BOLD + \
                 #     colorText.BLUE + stock + colorText.END
-                screeningDictionary['Stock'] = colorText.BOLD + \
-                     colorText.BLUE + f'\x1B]8;;https://in.tradingview.com/chart?symbol=NSE%3A{stock}\x1B\\{stock}\x1B]8;;\x1B\\' + colorText.END
+                # screeningDictionary['Stock'] = colorText.BOLD + \
+                #     colorText.BLUE + \
+                #     f'\x1B]8;;https://in.tradingview.com/chart?symbol=NSE%3A{stock}\x1B\\{stock}\x1B]8;;\x1B\\' + colorText.END
+                screeningDictionary['Stock'] = colorText.BOLD + colorText.BLUE + \
+                    '<a href="https://in.tradingview.com/chart?symbol=NSE%3A' + \
+                    stock + '" target="_blank">' + stock + '</a>' + colorText.END
                 saveDictionary['Stock'] = stock
                 consolidationValue = screener.validateConsolidation(
                     processedData, screeningDictionary, saveDictionary, percentage=configManager.consolidationPercentage)
@@ -134,20 +138,25 @@ class StockConsumer(multiprocessing.Process):
                     saveDictionary['Trend'] = 'Unknown'
                 isCandlePattern = candlePatterns.findPattern(
                     processedData, screeningDictionary, saveDictionary)
-                
+
                 isConfluence = False
                 isInsideBar = False
                 isIpoBase = False
                 if respChartPattern == 3 and executeOption == 7:
-                    isIpoBase = screener.validateIpoBase(stock, fullData, screeningDictionary, saveDictionary)
+                    isIpoBase = screener.validateIpoBase(
+                        stock, fullData, screeningDictionary, saveDictionary)
                 if respChartPattern == 4 and executeOption == 7:
-                    isConfluence = screener.validateConfluence(stock, processedData, screeningDictionary, saveDictionary, percentage=insideBarToLookback)
+                    isConfluence = screener.validateConfluence(
+                        stock, processedData, screeningDictionary, saveDictionary, percentage=insideBarToLookback)
                 else:
-                    isInsideBar = screener.validateInsideBar(processedData, screeningDictionary, saveDictionary, chartPattern=respChartPattern, daysToLookback=insideBarToLookback)
-                
-                isMomentum = screener.validateMomentum(processedData, screeningDictionary, saveDictionary)
+                    isInsideBar = screener.validateInsideBar(
+                        processedData, screeningDictionary, saveDictionary, chartPattern=respChartPattern, daysToLookback=insideBarToLookback)
+
+                isMomentum = screener.validateMomentum(
+                    processedData, screeningDictionary, saveDictionary)
                 if maLength is not None and executeOption == 6:
-                    isMaSupport = screener.findReversalMA(fullData, screeningDictionary, saveDictionary, maLength)
+                    isMaSupport = screener.findReversalMA(
+                        fullData, screeningDictionary, saveDictionary, maLength)
 
                 with self.screenResultsCounter.get_lock():
                     if executeOption == 0:

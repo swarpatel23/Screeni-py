@@ -1,0 +1,19 @@
+.label {
+    margin-top: 0;
+}
+
+.green {
+    color: green;
+}
+
+.fail {
+    color: red;
+}
+
+.warn {
+    color: orange;
+}
+
+.blue {
+    color: blue;
+}
