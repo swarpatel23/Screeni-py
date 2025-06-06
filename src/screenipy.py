@@ -15,7 +15,7 @@ import classes.Utility as Utility
 from classes.ColorText import colorText
 from classes.OtaUpdater import OTAUpdater
 from classes.CandlePatterns import CandlePatterns
-from classes.ParallelProcessing import StockConsumer
+from classes.ParallelProcessing import screen_stock, init_pool_processes
 from classes.Changelog import VERSION
 from classes.Utility import isDocker, isGui
 from alive_progress import alive_bar
@@ -27,6 +27,7 @@ from datetime import datetime, date
 from time import sleep
 from tabulate import tabulate
 import multiprocessing
+import concurrent.futures
 multiprocessing.freeze_support()
 try:
     import chromadb
@@ -387,78 +388,48 @@ def main(testing=False, testBuild=False, downloadOnly=False, execute_inputs:list
                   configManager, fetcher, screener, candlePatterns, stock, newlyListedOnly, downloadOnly, vectorSearch, isDevVersion, backtestDate)
                  for stock in listStockCodes]
 
-        tasks_queue = multiprocessing.JoinableQueue()
-        results_queue = multiprocessing.Queue()
-
         totalConsumers = multiprocessing.cpu_count()
         if totalConsumers == 1:
             totalConsumers = 2      # This is required for single core machine
         if configManager.cacheEnabled is True and multiprocessing.cpu_count() > 2:
             totalConsumers -= 1
-        consumers = [StockConsumer(tasks_queue, results_queue, screenCounter, screenResultsCounter, stockDict, proxyServer, keyboardInterruptEvent)
-                     for _ in range(totalConsumers)]
-
-        for worker in consumers:
-            worker.daemon = True
-            worker.start()
 
         if testing or testBuild:
             for item in items:
-                tasks_queue.put(item)
-                result = results_queue.get()
+                result = screen_stock(item)
                 if result is not None:
                     screenResults = pd.concat([screenResults, pd.DataFrame([result[0]])], ignore_index=True)
                     saveResults = pd.concat([saveResults, pd.DataFrame([result[1]])], ignore_index=True)
                     if testing or (testBuild and len(screenResults) > 2):
                         break
         else:
-            for item in items:
-                tasks_queue.put(item)
-            # Append exit signal for each process indicated by None
-            for _ in range(multiprocessing.cpu_count()):
-                tasks_queue.put(None)
             try:
                 numStocks, totalStocks = len(listStockCodes), len(listStockCodes)
                 os.environ['SCREENIPY_TOTAL_STOCKS'] = str(totalStocks)
                 print(colorText.END+colorText.BOLD)
                 bar, spinner = Utility.tools.getProgressbarStyle()
-                with alive_bar(numStocks, bar=bar, spinner=spinner) as progressbar:
-                    while numStocks:
-                        result = results_queue.get()
-                        if result is not None:
-                            screenResults = pd.concat([screenResults, pd.DataFrame([result[0]])], ignore_index=True)
-                            saveResults = pd.concat([saveResults, pd.DataFrame([result[1]])], ignore_index=True)
-                        numStocks -= 1
-                        os.environ['SCREENIPY_SCREEN_COUNTER'] = str(int((totalStocks-numStocks)/totalStocks*100))
-                        progressbar.text(colorText.BOLD + colorText.GREEN +
-                                         f'Found {screenResultsCounter.value} Stocks' + colorText.END)
-                        progressbar()
+                with concurrent.futures.ProcessPoolExecutor(
+                        max_workers=totalConsumers,
+                        initializer=init_pool_processes,
+                        initargs=(screenCounter, screenResultsCounter, stockDict, proxyServer, keyboardInterruptEvent)) as executor:
+                    futures = [executor.submit(screen_stock, item) for item in items]
+                    with alive_bar(numStocks, bar=bar, spinner=spinner) as progressbar:
+                        for future in concurrent.futures.as_completed(futures):
+                            result = future.result()
+                            if result is not None:
+                                screenResults = pd.concat([screenResults, pd.DataFrame([result[0]])], ignore_index=True)
+                                saveResults = pd.concat([saveResults, pd.DataFrame([result[1]])], ignore_index=True)
+                            numStocks -= 1
+                            os.environ['SCREENIPY_SCREEN_COUNTER'] = str(int((totalStocks-numStocks)/totalStocks*100))
+                            progressbar.text(colorText.BOLD + colorText.GREEN +
+                                             f'Found {screenResultsCounter.value} Stocks' + colorText.END)
+                            progressbar()
             except KeyboardInterrupt:
-                try:
-                    keyboardInterruptEvent.set()
-                except KeyboardInterrupt:
-                    pass
                 print(colorText.BOLD + colorText.FAIL +
                       "\n[+] Terminating Script, Please wait..." + colorText.END)
-                for worker in consumers:
-                    worker.terminate()
+                executor.shutdown(cancel_futures=True)
 
         print(colorText.END)
-        # Exit all processes. Without this, it threw error in next screening session
-        for worker in consumers:
-            try:
-                worker.terminate()
-            except OSError as e:
-                if e.winerror == 5:
-                    pass
-
-        # Flush the queue so depending processes will end
-        from queue import Empty
-        while True:
-            try:
-                _ = tasks_queue.get(False)
-            except Exception as e:
-                break
 
         if CHROMA_AVAILABLE and type(vectorSearch) == list and vectorSearch[2]:
             chroma_client = chromadb.PersistentClient(path=CHROMADB_PATH)

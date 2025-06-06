@@ -23,6 +23,13 @@ from classes.CandlePatterns import CandlePatterns
 from classes.ColorText import colorText
 from classes.SuppressOutput import SuppressOutput
 
+# Globals used for ProcessPool based parallel execution
+screenCounter = None
+screenResultsCounter = None
+stockDict = None
+proxyServer = None
+keyboardInterruptEvent = None
+
 if sys.platform.startswith('win'):
     import multiprocessing.popen_spawn_win32 as forking
 else:
@@ -311,3 +318,21 @@ class StockConsumer(multiprocessing.Process):
                                 os.putenv('_MEIPASS2', '')
 
             forking.Popen = _Popen
+
+
+def init_pool_processes(counter, result_counter, stock_dict, proxy_server, interrupt_event):
+    """Initializer for ProcessPoolExecutor workers."""
+    global screenCounter, screenResultsCounter, stockDict, proxyServer, keyboardInterruptEvent
+    screenCounter = counter
+    screenResultsCounter = result_counter
+    stockDict = stock_dict
+    proxyServer = proxy_server
+    keyboardInterruptEvent = interrupt_event
+
+
+def screen_stock(args):
+    """Wrapper to execute StockConsumer.screenStocks with ProcessPoolExecutor."""
+    consumer = StockConsumer(None, None, screenCounter,
+                             screenResultsCounter, stockDict,
+                             proxyServer, keyboardInterruptEvent)
+    return consumer.screenStocks(*args)
